@@ -1,0 +1,7 @@
+<div style="text-align: center; margin-top: 100px;">
+  <h2>Callback</h2>
+  <div *ngIf="auth.identityClaims">
+    <p>Welcome {{ auth.identityClaims['preferred_username'] }}</p>
+    <p>Token: {{ auth.token }}</p>
+  </div>
+</div>
