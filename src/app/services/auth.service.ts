@@ -23,7 +23,6 @@ export class AuthService {
     };
 
     this.oauthService.configure(authConfig);
-    this.oauthService.loadDiscoveryDocumentAndTryLogin();
   }
 
   login() {
@@ -40,5 +39,10 @@ export class AuthService {
 
   get token() {
     return this.oauthService.getAccessToken();
+  }
+
+  async initAuth(): Promise<void> {
+    await this.oauthService.loadDiscoveryDocument();
+    await this.oauthService.tryLoginCodeFlow();
   }
 }
