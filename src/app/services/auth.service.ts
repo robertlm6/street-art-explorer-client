@@ -1,20 +1,31 @@
 import { Injectable } from '@angular/core';
 import {AuthConfig, OAuthService} from 'angular-oauth2-oidc';
+import {environment} from '../../environments/environment';
+import {HttpClient} from '@angular/common/http';
+import {Observable} from 'rxjs';
+
+export interface RegisterRequest {
+  username: string,
+  email: string,
+  password: string
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
 
-  constructor(private oauthService: OAuthService) {
+  private issuer = environment.authIssuer;
+
+  constructor(private oauthService: OAuthService, private httpClient: HttpClient) {
     this.configure();
   }
 
   private configure() {
     const authConfig: AuthConfig = {
-      issuer: 'http://localhost:9000',
-      redirectUri: window.location.origin + '/callback',
-      clientId: 'public-client',
+      issuer: this.issuer,
+      redirectUri: environment.authRedirectUri,
+      clientId: environment.authClientId,
       dummyClientSecret: 'secret',
       responseType: 'code',
       scope: 'openid',
@@ -23,6 +34,19 @@ export class AuthService {
     };
 
     this.oauthService.configure(authConfig);
+  }
+
+  register(body: RegisterRequest): Observable<any> {
+    return this.httpClient.post(`${this.issuer}/user/register`, body);
+  }
+
+  registerAndLogin(body: RegisterRequest): Observable<any> {
+    return new Observable(sub => {
+      this.register(body).subscribe({
+        next: (res) => { sub.next(res); sub.complete(); this.login(); },
+        error: (err) => sub.error(err)
+      });
+    });
   }
 
   login() {
@@ -37,8 +61,12 @@ export class AuthService {
     return this.oauthService.getIdentityClaims();
   }
 
-  get token() {
+  getAccessToken(): string | null {
     return this.oauthService.getAccessToken();
+  }
+
+  isAuthenticated(): boolean {
+    return this.oauthService.hasValidAccessToken();
   }
 
   async initAuth(): Promise<void> {
