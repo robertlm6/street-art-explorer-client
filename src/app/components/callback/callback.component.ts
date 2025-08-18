@@ -14,7 +14,7 @@ export class CallbackComponent implements OnInit{
   constructor(public auth: AuthService, private router: Router) {}
 
   ngOnInit() {
-    if (this.auth.token) {
+    if (this.auth.getAccessToken()) {
       this.router.navigate(['/home']);
     } else {
       this.router.navigate(['/']);
