@@ -1,0 +1,37 @@
+.marker-detail { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+
+.header { display: flex; align-items: center; gap: 12px; }
+.title-wrap { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 28ch;
+}
+.rating-inline {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 14px; opacity: .9;
+}
+.rating-inline .star { font-size: 18px; line-height: 1; }
+.rating-inline .avg { font-weight: 600; }
+.rating-inline .count { opacity: .7; }
+
+.spacer { flex: 1; }
+
+.view .desc { margin: 0; }
+.view .addr { margin: 0; opacity: .8; }
+.coords { font-size: 12px; opacity: .6; }
+
+.photos, .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.photo, .thumb { display: flex; flex-direction: column; gap: 4px; }
+.photo img, .thumb img { width: 100%; border-radius: 8px; }
+
+.form { display: grid; gap: 12px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.rating-actions { display: flex; align-items: center; gap: 8px; }
+
+.address-field .readonly-input {
+  cursor: not-allowed;
+}

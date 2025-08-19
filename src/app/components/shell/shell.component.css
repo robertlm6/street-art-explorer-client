@@ -1,0 +1,14 @@
+.app-toolbar { position: sticky; top: 0; z-index: 1000; }
+.title { margin-left: 8px; font-weight: 600; }
+.spacer { flex: 1 1 auto; }
+.app-container { height: calc(100vh - 64px); }
+@media (max-width: 600px) {
+  .app-container { height: calc(100vh - 56px); }
+  .hide-desktop { display: inline-flex; }
+}
+@media (min-width: 601px) {
+  .hide-desktop { display: none; }
+}
+.app-content { padding: 0; }
+mat-sidenav { width: 260px; }
+a.active { background: rgba(0,0,0,0.06); }

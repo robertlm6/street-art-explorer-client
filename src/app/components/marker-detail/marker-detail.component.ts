@@ -1,0 +1,283 @@
+import {Component, OnDestroy, OnInit} from '@angular/core';
+import {AddPhotoRequest, MarkerDto, MarkerService, UpdateMarkerRequest} from '../../services/marker.service';
+import {FormBuilder, FormGroup, ReactiveFormsModule} from '@angular/forms';
+import {Subscription, switchMap} from 'rxjs';
+import {ActivatedRoute, Router} from '@angular/router';
+import {MatButtonModule} from '@angular/material/button';
+import {MatIconModule} from '@angular/material/icon';
+import {MatInputModule} from '@angular/material/input';
+import {CommonModule, DecimalPipe} from '@angular/common';
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {GeocodingService} from '../../services/geocoding.service';
+import {MatDialog, MatDialogModule} from '@angular/material/dialog';
+import {GeocoderDialogComponent} from '../geocoder-dialog/geocoder-dialog.component';
+
+@Component({
+  selector: 'app-marker-detail',
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatIconModule,
+    MatDialogModule,
+    DecimalPipe
+  ],
+  templateUrl: './marker-detail.component.html',
+  standalone: true,
+  styleUrl: './marker-detail.component.css'
+})
+export class MarkerDetailComponent implements OnInit, OnDestroy {
+  marker?: MarkerDto;
+  form!: FormGroup;
+  editing = false;
+  myScore?: number;
+  isNew = false;
+  private sub = new Subscription();
+
+  get inDrawer(): boolean {
+    const tree = this.router.parseUrl(this.router.url);
+    return !!tree.root.children['detail'];
+  }
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private fb: FormBuilder,
+    private markers: MarkerService,
+    private geocode: GeocodingService,
+    private dialog: MatDialog
+  ) {}
+
+  ngOnInit(): void {
+    const idParam = this.route.snapshot.paramMap.get('id');
+    this.isNew = idParam === 'new';
+
+    if (this.isNew) {
+      const lat = Number(this.route.snapshot.queryParamMap.get('lat') ?? 0) || 0;
+      const lng = Number(this.route.snapshot.queryParamMap.get('lng') ?? 0) || 0;
+      const initialAddress = this.route.snapshot.queryParamMap.get('address') ?? '';
+
+      // Local dto
+      this.marker = {
+        id: 0 as any,
+        authServerUserId: 0 as any,
+        title: '',
+        description: '',
+        address: '',
+        lat, lng,
+        avgRating: 0, ratingsCount: 0,
+        photos: [],
+        ownedByMe: true
+      };
+
+      this.form = this.fb.group({
+        title: [''],
+        description: [''],
+        address: [initialAddress],
+        lat: [lat],
+        lng: [lng],
+      });
+
+      this.editing = true;
+
+      if (lat && lng) {
+        this.geocode.reverse(lng, lat).subscribe(addr => {
+          if (addr) this.form.patchValue({ address: addr });
+        });
+      }
+
+      let t: any;
+      this.form.get('lat')!.valueChanges.subscribe(() => { clearTimeout(t); t = setTimeout(() => this.reverseNow(), 400); });
+      this.form.get('lng')!.valueChanges.subscribe(() => { clearTimeout(t); t = setTimeout(() => this.reverseNow(), 400); });
+
+      return;
+    }
+
+    this.sub.add(
+      this.route.paramMap.pipe(
+        switchMap(pm => this.markers.get(Number(pm.get('id'))))
+      ).subscribe(m => {
+        this.marker = m;
+        this.form = this.fb.group({
+          title: [m.title],
+          description: [m.description],
+          address: [m.address],
+          lat: [m.lat],
+          lng: [m.lng],
+        });
+      })
+    );
+
+    // Edit mode
+    this.sub.add(
+      this.route.queryParamMap.subscribe(qp => {
+        this.editing = qp.get('edit') === 'true';
+      })
+    );
+
+    // Rating
+    this.sub.add(
+      this.route.paramMap.subscribe(pm => {
+        const id = Number(pm.get('id'));
+        this.markers.myRating(id).subscribe({
+          next: r => this.myScore = r?.score,
+          error: _ => this.myScore = undefined
+        });
+      })
+    );
+  }
+
+  close(): void {
+    if (this.inDrawer) {
+      this.router.navigate([{ outlets: { detail: null } }], { queryParamsHandling: 'preserve' });
+    } else {
+      this.router.navigate(['/home']);
+    }
+  }
+
+  enableEdit(): void {
+    this.router.navigate([], { queryParams: { edit: 'true' }, queryParamsHandling: 'merge' });
+  }
+
+  disableEdit(): void {
+    this.router.navigate([], { queryParams: { edit: null }, queryParamsHandling: 'merge' });
+  }
+
+  save(): void {
+    if (!this.marker) return;
+
+    if (this.isNew) {
+      const payload = {
+        title: (this.form.value.title ?? '').trim(),
+        description: this.form.value.description ?? '',
+        address: this.form.value.address ?? '',
+        lat: Number(this.form.value.lat),
+        lng: Number(this.form.value.lng)
+      };
+      this.markers.create(payload).subscribe({
+        next: created => {
+          this.router.navigate(
+            [{ outlets: { detail: ['marker', created.id] } }],
+            { relativeTo: this.route.parent || this.route }
+          );
+          this.marker = created;
+          this.isNew = false;
+          this.editing = false;
+        },
+        error: _ => alert('It was not possible to create the marker (check the data)')
+      });
+      return;
+    }
+
+    // update
+    const id = this.marker.id;
+    const body: UpdateMarkerRequest = {};
+    Object.entries(this.form.value).forEach(([k, v]) => {
+      if (v !== (this.marker as any)[k]) (body as any)[k] = v;
+    });
+
+    this.markers.update(id, body).subscribe({
+      next: m => {
+        this.marker = m;
+        this.disableEdit();
+      },
+      error: _ => alert('It was not possible to save the marker (are you the owner?)')
+    });
+  }
+
+  remove(): void {
+    if (this.isNew) { this.close(); return; }
+    if (!this.marker) return;
+    if (!confirm('Are you sure you want to delete this marker?')) return;
+    this.markers.remove(this.marker.id).subscribe({
+      next: () => this.close(),
+      error: _ => alert('It was not possible to delete the marker (are you the owner?)')
+    });
+  }
+
+  setScore(s: number): void {
+    if (!this.marker) return;
+    this.markers.rate(this.marker.id, s).subscribe({
+      next: sum => {
+        this.marker!.avgRating = sum.avgRating;
+        this.marker!.ratingsCount = sum.ratingsCount;
+        this.myScore = s;
+      },
+      error: _ => alert('It was not possible to rate the marker (you cannot rate your own marker)')
+    });
+  }
+
+  deleteMyScore(): void {
+    if (!this.marker) return;
+    this.markers.deleteMyRating(this.marker.id).subscribe({
+      next: sum => {
+        this.marker!.avgRating = sum.avgRating;
+        this.marker!.ratingsCount = sum.ratingsCount;
+        this.myScore = undefined;
+      }
+    });
+  }
+
+  addPhotoFromCloudinaryUpload(result: any): void {
+    if (!this.marker || this.isNew) return;
+    const info = result?.info ?? result;
+    const req: AddPhotoRequest = {
+      publicId: info.public_id,
+      url: info.url,
+      secureUrl: info.secure_url,
+      thumbnailUrl: info.thumbnail_url ?? info.derived?.[0]?.secure_url,
+      format: info.format,
+      width: info.width,
+      height: info.height,
+      bytes: info.bytes,
+      position: (this.marker.photos?.length ?? 0)
+    };
+    this.markers.addPhoto(this.marker.id, req).subscribe({
+      next: photo => this.marker!.photos = [...(this.marker!.photos ?? []), photo],
+      error: _ => alert('It was not possible to add the photo (are you the owner?)')
+    });
+  }
+
+  deletePhoto(photoId: number): void {
+    if (!this.marker) return;
+    if (!confirm('Are you sure you want to delete this photo?')) return;
+    this.markers.deletePhoto(this.marker.id, photoId).subscribe({
+      next: () => this.marker!.photos = (this.marker!.photos ?? []).filter(p => p.id !== photoId),
+      error: _ => alert('It was not possible to delete the photo (are you the owner?)')
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.sub.unsubscribe();
+  }
+
+  private reverseNow() {
+    const lat = Number(this.form.value.lat), lng = Number(this.form.value.lng);
+    if (!isFinite(lat) || !isFinite(lng)) return;
+    if (this.form.dirty && this.form.get('address')?.dirty) return;
+    this.geocode.reverse(lng, lat).subscribe(addr => {
+      if (addr) this.form.patchValue({ address: addr }, { emitEvent: false });
+    });
+  }
+
+  openGeocoder(): void {
+    const ref = this.dialog.open(GeocoderDialogComponent, {
+      width: '500px',
+      height: '400px',
+      maxHeight: '90vh',
+    });
+
+    ref.afterClosed().subscribe(res => {
+      if (!res) return;
+      const { lat, lng, address } = res;
+      this.form.patchValue({ lat, lng, address });
+      if (this.marker) {
+        this.marker.lat = lat;
+        this.marker.lng = lng;
+        this.marker.address = address;
+      }
+    });
+  }
+}

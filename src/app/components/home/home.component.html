@@ -1,3 +1,20 @@
-<div class="map-wrapper">
-  <div id="map" class="map-container"></div>
-</div>
+<mat-drawer-container class="map-drawer-container">
+  <mat-drawer-content>
+    <div class="map-wrapper">
+      <div id="map" class="map-container"></div>
+
+      <button mat-fab class="fab-create" (click)="startCreate()"
+              aria-label="Add a marker">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+  </mat-drawer-content>
+
+  <mat-drawer #detailDrawer
+              mode="over"
+              position="end"
+              class="detail-drawer"
+              (openedChange)="onDrawerOpenedChange($event)">
+    <router-outlet name="detail"></router-outlet>
+  </mat-drawer>
+</mat-drawer-container>
