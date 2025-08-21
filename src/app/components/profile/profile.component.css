@@ -1,0 +1,8 @@
+.profile{ display:grid; gap:16px; padding:16px; }
+.header{ display:flex; align-items:center; gap:16px; }
+.avatar{
+  width:72px; height:72px; border-radius:50%;
+  background-size:cover; background-position:center; background-color:#eee; border:1px solid #ddd;
+}
+.form{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.form mat-form-field:nth-child(3){ grid-column: 1 / -1; }

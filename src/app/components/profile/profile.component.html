@@ -1,0 +1,27 @@
+<div class="profile">
+  <div class="header">
+    <div class="avatar" [style.backgroundImage]="'url(' + (me?.avatarUrl || fallback) + ')'"></div>
+    <div>
+      <h2>{{ me?.username }}</h2>
+      <button mat-stroked-button (click)="changeAvatar()">Change avatar</button>
+      <button mat-button *ngIf="me?.avatarPublicId" (click)="removeAvatar()">Remove avatar</button>
+    </div>
+  </div>
+
+  <form [formGroup]="form" class="form">
+    <mat-form-field appearance="outline">
+      <mat-label>First Name</mat-label>
+      <input matInput formControlName="firstName">
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Last Name</mat-label>
+      <input matInput formControlName="lastName">
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Bio</mat-label>
+      <textarea matInput formControlName="bio" rows="3"></textarea>
+    </mat-form-field>
+
+    <button mat-flat-button color="primary" (click)="save()">Save</button>
+  </form>
+</div>

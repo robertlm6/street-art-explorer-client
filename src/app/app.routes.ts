@@ -6,6 +6,7 @@ import {HomeComponent} from './components/home/home.component';
 import {RegisterComponent} from './components/register/register.component';
 import {MarkerDetailComponent} from './components/marker-detail/marker-detail.component';
 import {ShellComponent} from './components/shell/shell.component';
+import {ProfileComponent} from './components/profile/profile.component';
 
 export const routes: Routes = [
   { path: '', component: LoginComponent },
@@ -24,6 +25,7 @@ export const routes: Routes = [
           { path: 'marker/new', component: MarkerDetailComponent, outlet: 'detail' }
         ]
       },
+      { path: 'profile', component: ProfileComponent },
       { path: '', pathMatch: 'full', redirectTo: 'home' }
     ]
   },

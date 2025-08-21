@@ -11,6 +11,7 @@ import {MatFormFieldModule} from '@angular/material/form-field';
 import {GeocodingService} from '../../services/geocoding.service';
 import {MatDialog, MatDialogModule} from '@angular/material/dialog';
 import {GeocoderDialogComponent} from '../geocoder-dialog/geocoder-dialog.component';
+import {CloudinaryService} from '../../services/cloudinary.service';
 
 @Component({
   selector: 'app-marker-detail',
@@ -48,6 +49,7 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private markers: MarkerService,
     private geocode: GeocodingService,
+    private cloudinary: CloudinaryService,
     private dialog: MatDialog
   ) {}
 
@@ -262,31 +264,44 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  addPhotoFromCloudinaryUpload(result: any): void {
+  addPhoto(): void {
     if (!this.marker || this.isNew) return;
-    const info = result?.info ?? result;
-    const req: AddPhotoRequest = {
-      publicId: info.public_id,
-      url: info.url,
-      secureUrl: info.secure_url,
-      thumbnailUrl: info.thumbnail_url ?? info.derived?.[0]?.secure_url,
-      format: info.format,
-      width: info.width,
-      height: info.height,
-      bytes: info.bytes,
-      position: (this.marker.photos?.length ?? 0)
-    };
-    this.markers.addPhoto(this.marker.id, req).subscribe({
-      next: photo => this.marker!.photos = [...(this.marker!.photos ?? []), photo],
-      error: _ => alert('It was not possible to add the photo (are you the owner?)')
-    });
+
+    this.cloudinary.openUploadWidget(
+      { folder: `markers/${this.marker.id}`, multiple: false, maxFiles: 1 },
+      (info) => {
+        const req: AddPhotoRequest = {
+          publicId: info.public_id,
+          url: info.url,
+          secureUrl: info.secure_url,
+          thumbnailUrl: info.thumbnail_url ?? info.derived?.[0]?.secure_url,
+          format: info.format,
+          width: info.width,
+          height: info.height,
+          bytes: info.bytes,
+          position: (this.marker!.photos?.length ?? 0)
+        };
+
+        this.markers.addPhoto(this.marker!.id, req).subscribe({
+          next: photo => {
+            this.marker!.photos = [...(this.marker!.photos ?? []), photo];
+            this.markers.emitMarkerUpdated(this.marker!);
+          },
+          error: _ => alert('It was not possible to add the photo (are you the owner?)')
+        });
+      }
+    );
   }
 
   deletePhoto(photoId: number): void {
     if (!this.marker) return;
     if (!confirm('Are you sure you want to delete this photo?')) return;
+
     this.markers.deletePhoto(this.marker.id, photoId).subscribe({
-      next: () => this.marker!.photos = (this.marker!.photos ?? []).filter(p => p.id !== photoId),
+      next: () => {
+        this.marker!.photos = (this.marker!.photos ?? []).filter(p => p.id !== photoId);
+        this.markers.emitMarkerUpdated(this.marker!);
+      },
       error: _ => alert('It was not possible to delete the photo (are you the owner?)')
     });
   }
