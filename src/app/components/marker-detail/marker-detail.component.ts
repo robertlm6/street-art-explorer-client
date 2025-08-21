@@ -30,6 +30,7 @@ import {GeocoderDialogComponent} from '../geocoder-dialog/geocoder-dialog.compon
 })
 export class MarkerDetailComponent implements OnInit, OnDestroy {
   marker?: MarkerDto;
+  private original?: MarkerDto;
   form!: FormGroup;
   editing = false;
   myScore?: number;
@@ -100,6 +101,7 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
         switchMap(pm => this.markers.get(Number(pm.get('id'))))
       ).subscribe(m => {
         this.marker = m;
+        this.original = { ...m };
         this.form = this.fb.group({
           title: [m.title],
           description: [m.description],
@@ -156,15 +158,21 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
         lat: Number(this.form.value.lat),
         lng: Number(this.form.value.lng)
       };
+
       this.markers.create(payload).subscribe({
         next: created => {
+          created.ownedByMe = true;
+          this.marker = created;
+          this.original = { ...created };
+          this.isNew = false;
+          this.editing = false;
+
+          this.markers.emitMarkerCreated(created);
+
           this.router.navigate(
             [{ outlets: { detail: ['marker', created.id] } }],
             { relativeTo: this.route.parent || this.route }
           );
-          this.marker = created;
-          this.isNew = false;
-          this.editing = false;
         },
         error: _ => alert('It was not possible to create the marker (check the data)')
       });
@@ -173,15 +181,33 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
 
     // update
     const id = this.marker.id;
+    const curr = this.form.value;
+    const orig = this.original!;
+
     const body: UpdateMarkerRequest = {};
-    Object.entries(this.form.value).forEach(([k, v]) => {
-      if (v !== (this.marker as any)[k]) (body as any)[k] = v;
-    });
+    const fields: (keyof UpdateMarkerRequest)[] = ['title','description','address','lat','lng'];
+
+    for (const f of fields) {
+      let v: any = (curr as any)[f];
+      if (f === 'lat' || f === 'lng') v = Number(v);
+      if (v !== (orig as any)[f]) {
+        (body as any)[f] = v;
+      }
+    }
+
+    if (Object.keys(body).length === 0) {
+      this.disableEdit();
+      return;
+    }
 
     this.markers.update(id, body).subscribe({
       next: m => {
+        m.ownedByMe = true;
         this.marker = m;
+        this.original = { ...m };
         this.disableEdit();
+
+        this.markers.emitMarkerUpdated(m);
       },
       error: _ => alert('It was not possible to save the marker (are you the owner?)')
     });
@@ -192,7 +218,10 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
     if (!this.marker) return;
     if (!confirm('Are you sure you want to delete this marker?')) return;
     this.markers.remove(this.marker.id).subscribe({
-      next: () => this.close(),
+      next: () => {
+        this.markers.emitMarkerDeleted(this.marker!.id);
+        this.close()
+      },
       error: _ => alert('It was not possible to delete the marker (are you the owner?)')
     });
   }
@@ -204,6 +233,8 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
         this.marker!.avgRating = sum.avgRating;
         this.marker!.ratingsCount = sum.ratingsCount;
         this.myScore = s;
+
+        this.markers.emitMarkerUpdated(this.marker!);
       },
       error: _ => alert('It was not possible to rate the marker (you cannot rate your own marker)')
     });
@@ -216,6 +247,8 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
         this.marker!.avgRating = sum.avgRating;
         this.marker!.ratingsCount = sum.ratingsCount;
         this.myScore = undefined;
+
+        this.markers.emitMarkerUpdated(this.marker!);
       }
     });
   }
@@ -272,8 +305,10 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
     ref.afterClosed().subscribe(res => {
       if (!res) return;
       const { lat, lng, address } = res;
+
       this.form.patchValue({ lat, lng, address });
-      if (this.marker) {
+
+      if (this.isNew && this.marker) {
         this.marker.lat = lat;
         this.marker.lng = lng;
         this.marker.address = address;

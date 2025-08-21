@@ -24,8 +24,10 @@ const MapboxGeocoder: any = (_MapboxGeocoder as any)?.default ?? _MapboxGeocoder
 export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
   private map?: Map;
   private markers: Marker[] = [];
+  private lastList: MarkerDto[] = [];
   private move$ = new Subject<void>();
   private geocoder: MapboxGeocoder | null = null;
+  private tempMarker?: mapboxgl.Marker;
 
   @ViewChild('detailDrawer') detailDrawer!: MatDrawer;
 
@@ -33,6 +35,26 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
 
   ngOnInit(): void {
     (mapboxgl as any).accessToken = environment.mapboxToken;
+
+    this.markersApi.markerCreated$.subscribe(created => {
+      this.tempMarker?.remove();
+      this.tempMarker = undefined;
+
+      this.lastList = [...this.lastList, created];
+      this.renderMarkers(this.lastList);
+    });
+
+    this.markersApi.markerUpdated$.subscribe(updated => {
+      this.lastList = this.lastList.map(m =>
+        m.id === updated.id ? updated : m
+      );
+      this.renderMarkers(this.lastList);
+    });
+
+    this.markersApi.markerDeleted$.subscribe(id => {
+      this.lastList = this.lastList.filter(m => m.id !== id);
+      this.renderMarkers(this.lastList);
+    });
 
     // Location by default: Madrid
     const center: LngLatLike = [-3.7038, 40.4168];
@@ -77,6 +99,9 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
       geocoder.on('result', (e: any) => {
         const [lng, lat] = e.result.center;
         const place = e.result.place_name as string;
+
+        this.showTempMarker(lng, lat);
+
         this.zone.run(() => {
           this.router.navigate(
             [{ outlets: { detail: ['marker', 'new'] } }],
@@ -87,6 +112,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
 
       this.map!.on('contextmenu', (e: mapboxgl.MapMouseEvent) => {
         const { lng, lat } = e.lngLat;
+        this.showTempMarker(lng, lat);
         this.zone.run(() => {
           this.router.navigate(
             [{ outlets: { detail: ['marker', 'new'] } }],
@@ -119,7 +145,10 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
     this.markersApi
       .listByBbox(sw.lat, ne.lat, sw.lng, ne.lng, 200)
       .subscribe({
-        next: list => this.renderMarkers(list),
+        next: list => {
+          this.lastList = list;
+          this.renderMarkers(list)
+        },
         error: err => console.error('Error loading markers (bbox)', err)
       });
   }
@@ -179,6 +208,23 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
     });
   }
 
+  private showTempMarker(lng: number, lat: number) {
+    this.tempMarker?.remove();
+
+    const el = document.createElement('div');
+    el.style.width = '24px';
+    el.style.height = '24px';
+    el.style.borderRadius = '50%';
+    el.style.boxShadow = '0 0 0 3px rgba(33,150,243,.25)';
+    el.style.background = '#2196f3';
+    el.style.opacity = '0.85';
+    el.style.border = '2px solid white';
+
+    this.tempMarker = new mapboxgl.Marker({ element: el, draggable: false })
+      .setLngLat([lng, lat])
+      .addTo(this.map!);
+  }
+
   ngOnDestroy(): void {
     this.markers.forEach(m => m.remove());
     if (this.geocoder && this.map) {
@@ -198,6 +244,9 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
     setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
 
     if (!opened) {
+      this.tempMarker?.remove();
+      this.tempMarker = undefined;
+
       this.router.navigate(
         [{ outlets: { detail: null } }],
         { relativeTo: this.route, queryParamsHandling: 'preserve' }

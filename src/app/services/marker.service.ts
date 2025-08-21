@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import {environment} from '../../environments/environment';
 import {HttpClient, HttpParams} from '@angular/common/http';
-import {Observable} from 'rxjs';
+import {map, Observable, Subject} from 'rxjs';
+import {OAuthService} from 'angular-oauth2-oidc';
 
 
 export interface MarkerDto {
@@ -70,21 +71,34 @@ export interface AddPhotoRequest {
 export class MarkerService {
   private base = environment.resourceApi + environment.markersEndpoint;
 
-  constructor(private httpClient: HttpClient) {}
+  private markerCreatedSource = new Subject<MarkerDto>();
+  markerCreated$ = this.markerCreatedSource.asObservable();
 
-   listByBbox(minLat: number, maxLat: number, minLng: number, maxLng: number, limit = 200): Observable<MarkerDto[]> {
+  private markerUpdatedSource = new Subject<MarkerDto>();
+  markerUpdated$ = this.markerUpdatedSource.asObservable();
+
+  private markerDeletedSource = new Subject<number>();
+  markerDeleted$ = this.markerDeletedSource.asObservable();
+
+  constructor(private httpClient: HttpClient, private oauth: OAuthService) {}
+
+  private enrich(dto: MarkerDto): MarkerDto {
+    return dto;
+  }
+
+  listByBbox(minLat: number, maxLat: number, minLng: number, maxLng: number, limit = 200): Observable<MarkerDto[]> {
      const params = new HttpParams()
        .set('minLat', String(minLat))
        .set('maxLat', String(maxLat))
        .set('minLng', String(minLng))
        .set('maxLng', String(maxLng))
        .set('limit', String(limit));
-     return this.httpClient.get<MarkerDto[]>(`${this.base}`, { params });
+     return this.httpClient.get<MarkerDto[]>(`${this.base}`, { params }).pipe(map(list => list.map(dto => this.enrich(dto))));
    }
 
-  get(id: number) { return this.httpClient.get<MarkerDto>(`${this.base}/${id}`); }
-  create(body: CreateMarkerRequest) { return this.httpClient.post<MarkerDto>(`${this.base}/create`, body); }
-  update(id: number, body: UpdateMarkerRequest) { return this.httpClient.patch<MarkerDto>(`${this.base}/${id}`, body); }
+  get(id: number) { return this.httpClient.get<MarkerDto>(`${this.base}/${id}`).pipe(map(dto => this.enrich(dto))); }
+  create(body: CreateMarkerRequest) { return this.httpClient.post<MarkerDto>(`${this.base}/create`, body).pipe(map(dto => this.enrich(dto))); }
+  update(id: number, body: UpdateMarkerRequest) { return this.httpClient.patch<MarkerDto>(`${this.base}/${id}`, body).pipe(map(dto => this.enrich(dto))); }
   remove(id: number) { return this.httpClient.delete<void>(`${this.base}/${id}`); }
 
   rate(id: number, score: number) { return this.httpClient.post<RatingSummary>(`${this.base}/${id}/ratings`, { score }); }
@@ -97,5 +111,17 @@ export class MarkerService {
   }
   deletePhoto(markerId: number, photoId: number) {
     return this.httpClient.delete<void>(`${this.base}/${markerId}/photos/${photoId}`);
+  }
+
+  emitMarkerCreated(marker: MarkerDto) {
+    this.markerCreatedSource.next(this.enrich(marker));
+  }
+
+  emitMarkerUpdated(marker: MarkerDto) {
+    this.markerUpdatedSource.next(this.enrich(marker));
+  }
+
+  emitMarkerDeleted(id: number) {
+    this.markerDeletedSource.next(id);
   }
 }
