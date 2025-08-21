@@ -1,8 +1,8 @@
 import {Component, OnDestroy, OnInit} from '@angular/core';
 import {AddPhotoRequest, MarkerDto, MarkerService, UpdateMarkerRequest} from '../../services/marker.service';
 import {FormBuilder, FormGroup, ReactiveFormsModule} from '@angular/forms';
-import {Subscription, switchMap} from 'rxjs';
-import {ActivatedRoute, Router} from '@angular/router';
+import {filter, Subscription, switchMap} from 'rxjs';
+import {ActivatedRoute, NavigationEnd, Router} from '@angular/router';
 import {MatButtonModule} from '@angular/material/button';
 import {MatIconModule} from '@angular/material/icon';
 import {MatInputModule} from '@angular/material/input';
@@ -112,11 +112,13 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
       })
     );
 
+    this.applyEditFromUrl();
+
     // Edit mode
     this.sub.add(
-      this.route.queryParamMap.subscribe(qp => {
-        this.editing = qp.get('edit') === 'true';
-      })
+      this.router.events
+        .pipe(filter(e => e instanceof NavigationEnd))
+        .subscribe(() => this.applyEditFromUrl())
     );
 
     // Rating
@@ -140,11 +142,13 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
   }
 
   enableEdit(): void {
-    this.router.navigate([], { queryParams: { edit: 'true' }, queryParamsHandling: 'merge' });
+    this.editing = true;
+    this.router.navigate([], { relativeTo: this.route.parent || this.route, queryParams: { edit: 'true' }, queryParamsHandling: 'merge' });
   }
 
   disableEdit(): void {
-    this.router.navigate([], { queryParams: { edit: null }, queryParamsHandling: 'merge' });
+    this.editing = false;
+    this.router.navigate([], { relativeTo: this.route.parent || this.route, queryParams: { edit: null }, queryParamsHandling: 'merge' });
   }
 
   save(): void {
@@ -171,7 +175,12 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
 
           this.router.navigate(
             [{ outlets: { detail: ['marker', created.id] } }],
-            { relativeTo: this.route.parent || this.route }
+            {
+              relativeTo: this.route.parent || this.route,
+              queryParams: { edit: null },
+              queryParamsHandling: 'merge',
+              replaceUrl: true
+            }
           );
         },
         error: _ => alert('It was not possible to create the marker (check the data)')
@@ -293,6 +302,11 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
     this.geocode.reverse(lng, lat).subscribe(addr => {
       if (addr) this.form.patchValue({ address: addr }, { emitEvent: false });
     });
+  }
+
+  private applyEditFromUrl(): void {
+    const tree = this.router.parseUrl(this.router.url);
+    this.editing = tree.queryParams['edit'] === 'true';
   }
 
   openGeocoder(): void {
