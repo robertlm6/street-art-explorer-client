@@ -1,6 +1,46 @@
-<div style="text-align: center; margin-top: 100px;">
-  <h2>Welcome!</h2>
-  <button (click)="login()">Sign in</button>
-  <p>Don't have an account?</p>
-  <button (click)="register()">Create an Account</button>
-</div>
+<section class="hero">
+  <img class="hero-img" src="sae-picture.png"
+       srcset="
+          sae-picture.png 1280w,
+          sae-picture.png 1920w,
+          sae-picture.png 2560w"
+       sizes="100vw"
+       alt="Illustration of a graffiti artist painting a colorful mural on a brick wall." aria-hidden="true"/>
+
+  <div class="overlay"></div>
+
+  <div class="hero-content">
+    <h1 class="app-name">Street Art Explorer</h1>
+    <p class="tagline">The newest app to discover &amp; share street art.</p>
+
+    <div class="cta">
+      <button mat-flat-button color="primary" (click)="login()" aria-label="Sign in">Sign in</button>
+      <button mat-flat-button color="primary" (click)="register()" aria-label="Create an account">Create an account
+      </button>
+    </div>
+
+    <p class="subtext">Free to use. No credit card required.</p>
+  </div>
+</section>
+
+<section class="features">
+  <div class="feature">
+    <mat-icon>map</mat-icon>
+    <h3>Explore</h3>
+    <p>Find murals near you on an interactive map.</p>
+  </div>
+  <div class="feature">
+    <mat-icon>add_location_alt</mat-icon>
+    <h3>Add</h3>
+    <p>Drop markers with photos, address and coords.</p>
+  </div>
+  <div class="feature">
+    <mat-icon>star</mat-icon>
+    <h3>Rate</h3>
+    <p>Rate spots and see the community’s picks.</p>
+  </div>
+</section>
+
+<footer class="login-footer">
+  <small>By street art lovers, for street art lovers.</small>
+</footer>
