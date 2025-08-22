@@ -4,7 +4,7 @@ import {MarkerDto, MarkerService} from '../../services/marker.service';
 import {environment} from '../../../environments/environment';
 import {debounceTime, filter, Subject} from 'rxjs';
 import {MatDrawer, MatSidenavModule} from '@angular/material/sidenav';
-import {ActivatedRoute, NavigationEnd, Router, RouterOutlet} from '@angular/router';
+import {ActivatedRoute, NavigationEnd, Router, RouterOutlet, UrlTree} from '@angular/router';
 import {CommonModule} from '@angular/common';
 import {MatIconModule} from '@angular/material/icon';
 import {MatButtonModule} from '@angular/material/button';
@@ -346,12 +346,20 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onDetailActivated() {
     this.detailDrawer?.open();
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: {lat: null, lng: null, z: null, focus: null},
-      queryParamsHandling: 'merge'
-    });
-    setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 0);
+
+    const tree: UrlTree = this.router.parseUrl(this.router.url);
+    const detailSegs = tree.root.children['detail']?.segments.map(s => s.path).join('/') || '';
+    const isNew = detailSegs === 'marker/new';
+
+    if (!isNew) {
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: {focus: null},
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
   }
 
   onDetailDeactivated() {
