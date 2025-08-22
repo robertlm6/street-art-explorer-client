@@ -4,8 +4,24 @@
   </button>
   <span class="title">Street Art Explorer</span>
   <span class="spacer"></span>
-  <button mat-button routerLink="/profile">Profile</button>
-  <button mat-button (click)="logout()">Logout</button>
+  <ng-container *ngIf="me$ | async as me">
+    <button mat-button [matMenuTriggerFor]="userMenu" class="user-trigger">
+      <img class="user-avatar" [src]="me.avatarUrl || defaultAvatar" alt="avatar">
+      <span class="user-name">{{ me.username }}</span>
+      <mat-icon>expand_more</mat-icon>
+    </button>
+  </ng-container>
+
+  <mat-menu #userMenu="matMenu">
+    <button mat-menu-item (click)="goProfile()">
+      <mat-icon>person</mat-icon>
+      <span>Profile</span>
+    </button>
+    <button mat-menu-item (click)="logout()">
+      <mat-icon>logout</mat-icon>
+      <span>Logout</span>
+    </button>
+  </mat-menu>
 </mat-toolbar>
 
 <mat-sidenav-container class="app-container">

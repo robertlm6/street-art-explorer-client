@@ -14,7 +14,11 @@
               mode="over"
               position="end"
               class="detail-drawer"
+              [autoFocus]="false"
               (openedChange)="onDrawerOpenedChange($event)">
-    <router-outlet name="detail"></router-outlet>
+
+    <router-outlet name="detail"
+                   (activate)="onDetailActivated()"
+                   (deactivate)="onDetailDeactivated()"></router-outlet>
   </mat-drawer>
 </mat-drawer-container>

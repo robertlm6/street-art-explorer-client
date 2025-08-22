@@ -25,6 +25,12 @@ export const routes: Routes = [
           { path: 'marker/new', component: MarkerDetailComponent, outlet: 'detail' }
         ]
       },
+      {
+        path: 'user/:id',
+        loadComponent: () =>
+          import('./components/user-public/user-public.component')
+            .then(m => m.UserPublicComponent)
+      },
       { path: 'profile', component: ProfileComponent },
       { path: '', pathMatch: 'full', redirectTo: 'home' }
     ]

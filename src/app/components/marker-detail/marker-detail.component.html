@@ -1,72 +1,121 @@
 <div *ngIf="marker as m" class="marker-detail">
-  <header class="header">
-    <button mat-icon-button [attr.aria-label]="'Close'" (click)="close()">
-      <mat-icon>close</mat-icon>
-    </button>
+  <header class="md-header">
+    <div class="md-row1">
+      <button mat-icon-button (click)="close()" aria-label="Close">
+        <mat-icon>close</mat-icon>
+      </button>
 
-    <div class="title-wrap">
-      <h2 class="title" [title]="isNew ? 'New marker' : m.title">
+      <h1 class="md-title" [title]="isNew ? 'New marker' : m.title">
         {{ isNew ? 'New marker' : m.title }}
-      </h2>
+      </h1>
 
-      <div class="rating-inline" *ngIf="!isNew && m.ratingsCount != null">
-        <mat-icon class="star" fontIcon="star"></mat-icon>
-        <span class="avg">{{ (m.avgRating || 0) | number:'1.1-1' }}</span>
-        <span class="count">({{ m.ratingsCount || 0 }})</span>
-      </div>
-    </div>
-
-    <span class="spacer"></span>
-
-    <ng-container *ngIf="isNew; else existingActions">
-      <button mat-flat-button color="primary" (click)="save()">Create</button>
-      <button mat-button (click)="close()">Cancel</button>
-    </ng-container>
-
-    <ng-template #existingActions>
-      <ng-container *ngIf="m.ownedByMe; else notOwnerActions">
-        <ng-container *ngIf="!editing; else editingActions">
-          <button mat-stroked-button color="primary" (click)="enableEdit()">Edit</button>
-          <button mat-button color="warn" (click)="remove()">Delete</button>
-        </ng-container>
-
-        <ng-template #editingActions>
-          <button mat-flat-button color="primary" (click)="save()">Save</button>
-          <button mat-button (click)="disableEdit()">Cancel</button>
-        </ng-template>
+      <ng-container *ngIf="isNew; else ratingBlock">
+        <div class="md-actions">
+          <button mat-flat-button color="primary" (click)="save()">Create</button>
+          <button mat-button (click)="close()">Cancel</button>
+        </div>
       </ng-container>
 
-      <ng-template #notOwnerActions></ng-template>
-    </ng-template>
+      <ng-template #ratingBlock>
+        <ng-container *ngIf="m.ratingsCount != null">
+          <button class="md-chip" mat-stroked-button disabled>
+            <mat-icon inline>star</mat-icon>
+            <span>{{ (m.avgRating || 0) | number:'1.1-1' }}</span>
+            <span class="md-count">({{ m.ratingsCount || 0 }})</span>
+          </button>
+        </ng-container>
+      </ng-template>
+    </div>
+
+    <div class="md-row2">
+      <div class="md-owner" *ngIf="!isNew && m.owner as owner">
+        <button class="md-owner-link"
+                type="button"
+                [routerLink]="['/user', owner.id]">
+          <img class="md-owner-avatar" [src]="owner.avatarUrl || defaultAvatar" alt="owner"/>
+          <span class="md-owner-name">{{ owner.username }}</span>
+        </button>
+      </div>
+
+      <span class="md-spacer"></span>
+
+      <!-- Acciones cuando YA EXISTE -->
+      <ng-container *ngIf="!isNew">
+        <ng-container *ngIf="m.ownedByMe; else noOwnerBtns">
+          <ng-container *ngIf="!editing; else editBtns">
+            <button mat-stroked-button color="primary" (click)="enableEdit()">Edit</button>
+            <button mat-button color="warn" (click)="remove()">Delete</button>
+          </ng-container>
+          <ng-template #editBtns>
+            <button mat-flat-button color="primary" (click)="save()">Save</button>
+            <button mat-button (click)="disableEdit()">Cancel</button>
+          </ng-template>
+        </ng-container>
+        <ng-template #noOwnerBtns></ng-template>
+      </ng-container>
+    </div>
   </header>
 
-  <section *ngIf="!editing; else editForm" class="view">
-    <p class="desc" *ngIf="m.description">{{ m.description }}</p>
-    <p class="addr" *ngIf="m.address">{{ m.address }}</p>
-    <div class="coords">({{ m.lat }}, {{ m.lng }})</div>
+  <mat-divider></mat-divider>
 
-    <div class="photos" *ngIf="m.photos?.length">
-      <div class="photo" *ngFor="let p of m.photos">
-        <img [src]="p.thumbnailUrl || p.url" [alt]="m.title">
-        <button mat-mini-button color="warn" *ngIf="m.ownedByMe" (click)="deletePhoto(p.id)">Delete</button>
+  <section *ngIf="!editing; else editForm" class="md-section">
+    <div class="md-meta">
+      <div class="md-meta-row" *ngIf="m.description">
+        <mat-icon class="md-meta-icn">notes</mat-icon>
+        <p class="md-desc">{{ m.description }}</p>
+      </div>
+
+      <div class="md-meta-row" *ngIf="m.address">
+        <mat-icon class="md-meta-icn">place</mat-icon>
+        <p class="md-addr">{{ m.address }}</p>
+      </div>
+
+      <div class="md-meta-row">
+        <mat-icon class="md-meta-icn">my_location</mat-icon>
+        <code class="md-coords">({{ m.lat }}, {{ m.lng }})</code>
       </div>
     </div>
 
-    <div class="rating-actions" *ngIf="!isNew">
+    <mat-divider *ngIf="m.photos?.length"></mat-divider>
+
+    <div class="md-photos" *ngIf="m.photos?.length">
+      <div class="md-photo" *ngFor="let p of m.photos">
+        <div class="md-photo-wrap">
+          <img [src]="p.thumbnailUrl || p.url" [alt]="m.title">
+
+          <div class="md-cover-badge" *ngIf="m.coverPhotoId === p.id">Cover</div>
+        </div>
+
+        <div class="md-photo-actions" *ngIf="m.ownedByMe">
+          <button mat-stroked-button
+                  (click)="makeCover(p.id)"
+                  [disabled]="m.coverPhotoId === p.id">
+            {{ m.coverPhotoId === p.id ? 'Cover' : 'Make cover' }}
+          </button>
+          <button mat-button color="warn" (click)="deletePhoto(p.id)">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <mat-divider></mat-divider>
+    <div class="md-rating-actions" *ngIf="!isNew">
       <ng-container *ngIf="!m.ownedByMe; else ownerNoRate">
-        <div *ngIf="myScore; else rateBlock">
-          My rating: {{ myScore }} ⭐
-          <button mat-button (click)="deleteMyScore()">Delete</button>
+        <div *ngIf="myScore; else rateBlock" class="md-my-score">
+          <span>My rating:</span>
+          <strong>{{ myScore }} ⭐</strong>
+          <button mat-button (click)="deleteMyScore()">Remove</button>
         </div>
         <ng-template #rateBlock>
-          <span>Rate: </span>
-          <button
-            mat-icon-button
-            *ngFor="let s of [1,2,3,4,5]"
-            (click)="setScore(s)"
-            [attr.aria-label]="'Rate ' + s">
-            <mat-icon>star</mat-icon>
-          </button>
+          <span class="md-rate-label">Rate</span>
+          <div class="md-stars">
+            <button
+              mat-icon-button
+              *ngFor="let s of [1,2,3,4,5]"
+              (click)="setScore(s)"
+              [attr.aria-label]="'Rate ' + s">
+              <mat-icon>star</mat-icon>
+            </button>
+          </div>
         </ng-template>
       </ng-container>
       <ng-template #ownerNoRate></ng-template>
@@ -74,18 +123,18 @@
   </section>
 
   <ng-template #editForm>
-    <form [formGroup]="form" class="form">
-      <mat-form-field appearance="outline">
+    <form [formGroup]="form" class="md-form">
+      <mat-form-field appearance="outline" class="md-field">
         <mat-label>Title</mat-label>
         <input matInput formControlName="title">
       </mat-form-field>
 
-      <mat-form-field appearance="outline">
+      <mat-form-field appearance="outline" class="md-field">
         <mat-label>Description</mat-label>
         <textarea matInput formControlName="description" rows="4"></textarea>
       </mat-form-field>
 
-      <mat-form-field appearance="outline" class="address-field">
+      <mat-form-field appearance="outline" class="md-field md-address">
         <mat-label>Address</mat-label>
         <input matInput formControlName="address" readonly class="readonly-input">
         <button mat-icon-button matSuffix type="button" (click)="openGeocoder()" aria-label="Search an address">
@@ -93,26 +142,41 @@
         </button>
       </mat-form-field>
 
-      <div class="grid">
-        <mat-form-field appearance="outline">
+      <div class="md-grid-2">
+        <mat-form-field appearance="outline" class="md-field">
           <mat-label>Lat</mat-label>
           <input matInput type="number" formControlName="lat">
         </mat-form-field>
-        <mat-form-field appearance="outline">
+        <mat-form-field appearance="outline" class="md-field">
           <mat-label>Lng</mat-label>
           <input matInput type="number" formControlName="lng">
         </mat-form-field>
       </div>
 
-      <div class="photos-edit" *ngIf="m.ownedByMe">
-        <button mat-stroked-button type="button" (click)="addPhoto()">
+      <div class="md-photos-edit" *ngIf="m.ownedByMe">
+        <button mat-stroked-button type="button" (click)="addPhoto()" *ngIf="!isNew">
+          Add a photo
+        </button>
+        <button mat-stroked-button type="button" disabled *ngIf="isNew">
           Add a photo
         </button>
 
-        <div class="thumbs" *ngIf="m.photos?.length">
-          <div class="thumb" *ngFor="let p of m.photos">
-            <img [src]="p.thumbnailUrl || p.url" [alt]="m.title">
-            <button mat-mini-button color="warn" type="button" (click)="deletePhoto(p.id)">Delete</button>
+        <div class="md-thumbs" *ngIf="m.photos?.length">
+          <div class="md-thumb" *ngFor="let p of m.photos">
+            <div class="md-photo-wrap">
+              <img [src]="p.thumbnailUrl || p.url" [alt]="m.title">
+              <div class="md-cover-badge" *ngIf="m.coverPhotoId === p.id">Cover</div>
+            </div>
+
+            <div class="md-photo-actions">
+              <button mat-stroked-button
+                      type="button"
+                      (click)="makeCover(p.id)"
+                      [disabled]="m.coverPhotoId === p.id">
+                {{ m.coverPhotoId === p.id ? 'Cover' : 'Make cover' }}
+              </button>
+              <button mat-button color="warn" type="button" (click)="deletePhoto(p.id)">Delete</button>
+            </div>
           </div>
         </div>
       </div>

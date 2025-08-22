@@ -2,7 +2,7 @@ import {Component, OnDestroy, OnInit} from '@angular/core';
 import {AddPhotoRequest, MarkerDto, MarkerService, UpdateMarkerRequest} from '../../services/marker.service';
 import {FormBuilder, FormGroup, ReactiveFormsModule} from '@angular/forms';
 import {filter, Subscription, switchMap} from 'rxjs';
-import {ActivatedRoute, NavigationEnd, Router} from '@angular/router';
+import {ActivatedRoute, NavigationEnd, Router, RouterLink} from '@angular/router';
 import {MatButtonModule} from '@angular/material/button';
 import {MatIconModule} from '@angular/material/icon';
 import {MatInputModule} from '@angular/material/input';
@@ -11,6 +11,7 @@ import {MatFormFieldModule} from '@angular/material/form-field';
 import {GeocodingService} from '../../services/geocoding.service';
 import {MatDialog, MatDialogModule} from '@angular/material/dialog';
 import {GeocoderDialogComponent} from '../geocoder-dialog/geocoder-dialog.component';
+import {MatDividerModule} from '@angular/material/divider';
 import {CloudinaryService} from '../../services/cloudinary.service';
 
 @Component({
@@ -23,7 +24,9 @@ import {CloudinaryService} from '../../services/cloudinary.service';
     MatInputModule,
     MatIconModule,
     MatDialogModule,
-    DecimalPipe
+    MatDividerModule,
+    DecimalPipe,
+    RouterLink
   ],
   templateUrl: './marker-detail.component.html',
   standalone: true,
@@ -38,6 +41,8 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
   isNew = false;
   private sub = new Subscription();
 
+  defaultAvatar = '/default-avatar.jpg';
+
   get inDrawer(): boolean {
     const tree = this.router.parseUrl(this.router.url);
     return !!tree.root.children['detail'];
@@ -51,7 +56,8 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
     private geocode: GeocodingService,
     private cloudinary: CloudinaryService,
     private dialog: MatDialog
-  ) {}
+  ) {
+  }
 
   ngOnInit(): void {
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -62,7 +68,6 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
       const lng = Number(this.route.snapshot.queryParamMap.get('lng') ?? 0) || 0;
       const initialAddress = this.route.snapshot.queryParamMap.get('address') ?? '';
 
-      // Local dto
       this.marker = {
         id: 0 as any,
         authServerUserId: 0 as any,
@@ -87,13 +92,19 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
 
       if (lat && lng) {
         this.geocode.reverse(lng, lat).subscribe(addr => {
-          if (addr) this.form.patchValue({ address: addr });
+          if (addr) this.form.patchValue({address: addr});
         });
       }
 
       let t: any;
-      this.form.get('lat')!.valueChanges.subscribe(() => { clearTimeout(t); t = setTimeout(() => this.reverseNow(), 400); });
-      this.form.get('lng')!.valueChanges.subscribe(() => { clearTimeout(t); t = setTimeout(() => this.reverseNow(), 400); });
+      this.form.get('lat')!.valueChanges.subscribe(() => {
+        clearTimeout(t);
+        t = setTimeout(() => this.reverseNow(), 400);
+      });
+      this.form.get('lng')!.valueChanges.subscribe(() => {
+        clearTimeout(t);
+        t = setTimeout(() => this.reverseNow(), 400);
+      });
 
       return;
     }
@@ -103,7 +114,7 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
         switchMap(pm => this.markers.get(Number(pm.get('id'))))
       ).subscribe(m => {
         this.marker = m;
-        this.original = { ...m };
+        this.original = {...m};
         this.form = this.fb.group({
           title: [m.title],
           description: [m.description],
@@ -116,14 +127,12 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
 
     this.applyEditFromUrl();
 
-    // Edit mode
     this.sub.add(
       this.router.events
         .pipe(filter(e => e instanceof NavigationEnd))
         .subscribe(() => this.applyEditFromUrl())
     );
 
-    // Rating
     this.sub.add(
       this.route.paramMap.subscribe(pm => {
         const id = Number(pm.get('id'));
@@ -137,7 +146,7 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
 
   close(): void {
     if (this.inDrawer) {
-      this.router.navigate([{ outlets: { detail: null } }], { queryParamsHandling: 'preserve' });
+      this.router.navigate([{outlets: {detail: null}}], {queryParamsHandling: 'preserve'});
     } else {
       this.router.navigate(['/home']);
     }
@@ -145,12 +154,20 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
 
   enableEdit(): void {
     this.editing = true;
-    this.router.navigate([], { relativeTo: this.route.parent || this.route, queryParams: { edit: 'true' }, queryParamsHandling: 'merge' });
+    this.router.navigate([], {
+      relativeTo: this.route.parent || this.route,
+      queryParams: {edit: 'true'},
+      queryParamsHandling: 'merge'
+    });
   }
 
   disableEdit(): void {
     this.editing = false;
-    this.router.navigate([], { relativeTo: this.route.parent || this.route, queryParams: { edit: null }, queryParamsHandling: 'merge' });
+    this.router.navigate([], {
+      relativeTo: this.route.parent || this.route,
+      queryParams: {edit: null},
+      queryParamsHandling: 'merge'
+    });
   }
 
   save(): void {
@@ -169,34 +186,35 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
         next: created => {
           created.ownedByMe = true;
           this.marker = created;
-          this.original = { ...created };
+          this.original = {...created};
           this.isNew = false;
           this.editing = false;
 
           this.markers.emitMarkerCreated(created);
 
           this.router.navigate(
-            [{ outlets: { detail: ['marker', created.id] } }],
+            [{outlets: {detail: ['marker', created.id]}}],
             {
               relativeTo: this.route.parent || this.route,
-              queryParams: { edit: null },
+              queryParams: {edit: null},
               queryParamsHandling: 'merge',
               replaceUrl: true
             }
           );
+
+          this.reloadMarkerAndBroadcast(created.id);
         },
         error: _ => alert('It was not possible to create the marker (check the data)')
       });
       return;
     }
 
-    // update
     const id = this.marker.id;
     const curr = this.form.value;
     const orig = this.original!;
 
     const body: UpdateMarkerRequest = {};
-    const fields: (keyof UpdateMarkerRequest)[] = ['title','description','address','lat','lng'];
+    const fields: (keyof UpdateMarkerRequest)[] = ['title', 'description', 'address', 'lat', 'lng'];
 
     for (const f of fields) {
       let v: any = (curr as any)[f];
@@ -215,17 +233,21 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
       next: m => {
         m.ownedByMe = true;
         this.marker = m;
-        this.original = { ...m };
+        this.original = {...m};
         this.disableEdit();
 
         this.markers.emitMarkerUpdated(m);
+        this.reloadMarkerAndBroadcast(id);
       },
       error: _ => alert('It was not possible to save the marker (are you the owner?)')
     });
   }
 
   remove(): void {
-    if (this.isNew) { this.close(); return; }
+    if (this.isNew) {
+      this.close();
+      return;
+    }
     if (!this.marker) return;
     if (!confirm('Are you sure you want to delete this marker?')) return;
     this.markers.remove(this.marker.id).subscribe({
@@ -268,7 +290,7 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
     if (!this.marker || this.isNew) return;
 
     this.cloudinary.openUploadWidget(
-      { folder: `markers/${this.marker.id}`, multiple: false, maxFiles: 1 },
+      {folder: `markers/${this.marker.id}`, multiple: false, maxFiles: 1},
       (info) => {
         const req: AddPhotoRequest = {
           publicId: info.public_id,
@@ -286,6 +308,7 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
           next: photo => {
             this.marker!.photos = [...(this.marker!.photos ?? []), photo];
             this.markers.emitMarkerUpdated(this.marker!);
+            this.reloadMarkerAndBroadcast(this.marker!.id);
           },
           error: _ => alert('It was not possible to add the photo (are you the owner?)')
         });
@@ -300,9 +323,39 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
     this.markers.deletePhoto(this.marker.id, photoId).subscribe({
       next: () => {
         this.marker!.photos = (this.marker!.photos ?? []).filter(p => p.id !== photoId);
+
+        if (this.marker!.coverPhotoId === photoId) {
+          this.marker!.coverPhotoId = undefined;
+          this.marker!.coverPhotoUrl = undefined;
+        }
+
         this.markers.emitMarkerUpdated(this.marker!);
+        this.reloadMarkerAndBroadcast(this.marker!.id);
       },
       error: _ => alert('It was not possible to delete the photo (are you the owner?)')
+    });
+  }
+
+  makeCover(photoId: number) {
+    if (!this.marker) return;
+    this.markers.setCover(this.marker.id, photoId).subscribe({
+      next: () => {
+        this.marker!.coverPhotoId = photoId;
+        const ph = (this.marker!.photos || []).find(p => p.id === photoId);
+        this.marker!.coverPhotoUrl = ph?.url || ph?.thumbnailUrl;
+        this.markers.emitMarkerUpdated(this.marker!);
+        this.reloadMarkerAndBroadcast(this.marker!.id);
+      },
+      error: _ => alert('Could not set cover')
+    });
+  }
+
+  private reloadMarkerAndBroadcast(id: number) {
+    this.markers.get(id).subscribe(full => {
+      full.ownedByMe = true;
+      this.marker = full;
+      this.original = {...full};
+      this.markers.emitMarkerUpdated(full);
     });
   }
 
@@ -315,7 +368,7 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
     if (!isFinite(lat) || !isFinite(lng)) return;
     if (this.form.dirty && this.form.get('address')?.dirty) return;
     this.geocode.reverse(lng, lat).subscribe(addr => {
-      if (addr) this.form.patchValue({ address: addr }, { emitEvent: false });
+      if (addr) this.form.patchValue({address: addr}, {emitEvent: false});
     });
   }
 
@@ -333,9 +386,9 @@ export class MarkerDetailComponent implements OnInit, OnDestroy {
 
     ref.afterClosed().subscribe(res => {
       if (!res) return;
-      const { lat, lng, address } = res;
+      const {lat, lng, address} = res;
 
-      this.form.patchValue({ lat, lng, address });
+      this.form.patchValue({lat, lng, address});
 
       if (this.isNew && this.marker) {
         this.marker.lat = lat;

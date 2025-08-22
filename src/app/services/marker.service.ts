@@ -4,6 +4,11 @@ import {HttpClient, HttpParams} from '@angular/common/http';
 import {map, Observable, Subject} from 'rxjs';
 import {OAuthService} from 'angular-oauth2-oidc';
 
+export interface MarkerOwner {
+  id: number;
+  username: string;
+  avatarUrl?: string;
+}
 
 export interface MarkerDto {
   id: number;
@@ -17,6 +22,10 @@ export interface MarkerDto {
   ratingsCount?: number;
   photos?: MarkerPhotoDto[];
   ownedByMe?: boolean;
+
+  owner?: MarkerOwner;
+  coverPhotoId?: number;
+  coverPhotoUrl?: string;
 }
 
 export interface MarkerPhotoDto {
@@ -73,10 +82,8 @@ export class MarkerService {
 
   private markerCreatedSource = new Subject<MarkerDto>();
   markerCreated$ = this.markerCreatedSource.asObservable();
-
   private markerUpdatedSource = new Subject<MarkerDto>();
   markerUpdated$ = this.markerUpdatedSource.asObservable();
-
   private markerDeletedSource = new Subject<number>();
   markerDeleted$ = this.markerDeletedSource.asObservable();
 
@@ -96,15 +103,34 @@ export class MarkerService {
      return this.httpClient.get<MarkerDto[]>(`${this.base}`, { params }).pipe(map(list => list.map(dto => this.enrich(dto))));
    }
 
-  get(id: number) { return this.httpClient.get<MarkerDto>(`${this.base}/${id}`).pipe(map(dto => this.enrich(dto))); }
-  create(body: CreateMarkerRequest) { return this.httpClient.post<MarkerDto>(`${this.base}/create`, body).pipe(map(dto => this.enrich(dto))); }
-  update(id: number, body: UpdateMarkerRequest) { return this.httpClient.patch<MarkerDto>(`${this.base}/${id}`, body).pipe(map(dto => this.enrich(dto))); }
-  remove(id: number) { return this.httpClient.delete<void>(`${this.base}/${id}`); }
+  get(id: number) {
+    return this.httpClient.get<MarkerDto>(`${this.base}/${id}`).pipe(map(dto => this.enrich(dto)));
+  }
+  create(body: CreateMarkerRequest) {
+    return this.httpClient.post<MarkerDto>(`${this.base}/create`, body).pipe(map(dto => this.enrich(dto)));
+  }
+  update(id: number, body: UpdateMarkerRequest) {
+    return this.httpClient.patch<MarkerDto>(`${this.base}/${id}`, body).pipe(map(dto => this.enrich(dto)));
+  }
+  remove(id: number) {
+    return this.httpClient.delete<void>(`${this.base}/${id}`);
+  }
+  setCover(markerId: number, photoId: number) {
+    return this.httpClient.put<void>(`${this.base}/${markerId}/cover/${photoId}`, {});
+  }
 
-  rate(id: number, score: number) { return this.httpClient.post<RatingSummary>(`${this.base}/${id}/ratings`, { score }); }
-  myRating(id: number) { return this.httpClient.get<RateResponse>(`${this.base}/${id}/ratings/me`); }
-  deleteMyRating(id: number) { return this.httpClient.delete<RatingSummary>(`${this.base}/${id}/ratings/me`); }
-  ratingSummary(id: number) { return this.httpClient.get<RatingSummary>(`${this.base}/${id}/ratings/summary`); }
+  rate(id: number, score: number) {
+    return this.httpClient.post<RatingSummary>(`${this.base}/${id}/ratings`, { score });
+  }
+  myRating(id: number) {
+    return this.httpClient.get<RateResponse>(`${this.base}/${id}/ratings/me`);
+  }
+  deleteMyRating(id: number) {
+    return this.httpClient.delete<RatingSummary>(`${this.base}/${id}/ratings/me`);
+  }
+  ratingSummary(id: number) {
+    return this.httpClient.get<RatingSummary>(`${this.base}/${id}/ratings/summary`);
+  }
 
   addPhoto(markerId: number, req: AddPhotoRequest) {
     return this.httpClient.post<MarkerPhotoDto>(`${this.base}/${markerId}/photos`, req);
@@ -116,11 +142,9 @@ export class MarkerService {
   emitMarkerCreated(marker: MarkerDto) {
     this.markerCreatedSource.next(this.enrich(marker));
   }
-
   emitMarkerUpdated(marker: MarkerDto) {
     this.markerUpdatedSource.next(this.enrich(marker));
   }
-
   emitMarkerDeleted(id: number) {
     this.markerDeletedSource.next(id);
   }

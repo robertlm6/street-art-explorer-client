@@ -4,6 +4,7 @@ import {environment} from '../../environments/environment';
 import {Observable} from 'rxjs';
 
 export interface UserAppDto {
+  id: number;
   authServerUserId: number;
   username: string;
   email: string;

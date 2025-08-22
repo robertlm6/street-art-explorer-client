@@ -1,5 +1,5 @@
 import {AfterViewInit, Component, NgZone, OnDestroy, OnInit, ViewChild} from '@angular/core';
-import mapboxgl, {Map, LngLatLike, Marker} from 'mapbox-gl';
+import mapboxgl, {LngLatLike, Map as MapboxMap, Marker} from 'mapbox-gl';
 import {MarkerDto, MarkerService} from '../../services/marker.service';
 import {environment} from '../../../environments/environment';
 import {debounceTime, filter, Subject} from 'rxjs';
@@ -21,17 +21,23 @@ const MapboxGeocoder: any = (_MapboxGeocoder as any)?.default ?? _MapboxGeocoder
   standalone: true,
   styleUrl: './home.component.css'
 })
-export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
-  private map?: Map;
+export class HomeComponent implements OnInit, OnDestroy, AfterViewInit {
+  private map?: MapboxMap;
   private markers: Marker[] = [];
   private lastList: MarkerDto[] = [];
   private move$ = new Subject<void>();
   private geocoder: MapboxGeocoder | null = null;
   private tempMarker?: mapboxgl.Marker;
+  private markersById = new Map<number, Marker>();
+  private pendingCenter?: { lng: number; lat: number; z: number };
+  private pendingFocusId?: number;
+
+  defaultAvatar = '/default-avatar.jpg';
 
   @ViewChild('detailDrawer') detailDrawer!: MatDrawer;
 
-  constructor(private markersApi: MarkerService, private zone: NgZone, private router: Router, private route: ActivatedRoute) {}
+  constructor(private markersApi: MarkerService, private zone: NgZone, private router: Router, private route: ActivatedRoute) {
+  }
 
   ngOnInit(): void {
     (mapboxgl as any).accessToken = environment.mapboxToken;
@@ -56,7 +62,35 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
       this.renderMarkers(this.lastList);
     });
 
-    // Location by default: Madrid
+    this.route.queryParamMap.subscribe(qp => {
+      const latStr = qp.get('lat');
+      const lngStr = qp.get('lng');
+      const zStr = qp.get('z');
+      const focusStr = qp.get('focus');
+
+      if (latStr !== null && lngStr !== null && latStr !== '' && lngStr !== '') {
+        const lat = Number(latStr);
+        const lng = Number(lngStr);
+        const z = zStr && zStr !== '' ? Number(zStr) : 15;
+
+        if (isFinite(lat) && isFinite(lng)) {
+          if (this.map && this.map.loaded()) {
+            this.map.flyTo({center: [lng, lat], zoom: z});
+          } else {
+            this.pendingCenter = {lng, lat, z};
+          }
+        }
+      }
+
+      if (focusStr !== null && focusStr !== '') {
+        const focus = Number(focusStr);
+        if (isFinite(focus) && focus > 0) {
+          this.pendingFocusId = focus;
+          this.tryOpenPendingPopup();
+        }
+      }
+    });
+
     const center: LngLatLike = [-3.7038, 40.4168];
     this.map = new mapboxgl.Map({
       container: 'map',
@@ -73,14 +107,22 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
           const userCenter: LngLatLike = [pos.coords.longitude, pos.coords.latitude];
           this.map?.setCenter(userCenter);
         },
-        () => {},
-        { enableHighAccuracy: true, timeout: 5000 }
+        () => {
+        },
+        {enableHighAccuracy: true, timeout: 5000}
       );
     }
 
     this.map.on('load', () => {
-      this.loadMarkersInView();
       this.map?.on('moveend', () => this.move$.next());
+
+      if (this.pendingCenter) {
+        const {lng, lat, z} = this.pendingCenter;
+        this.map!.jumpTo({center: [lng, lat], zoom: z}); // jumpTo para que sea inmediato
+        this.pendingCenter = undefined;
+      }
+
+      this.loadMarkersInView();
 
       const geocoder = new MapboxGeocoder({
         accessToken: environment.mapboxToken,
@@ -104,19 +146,19 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
 
         this.zone.run(() => {
           this.router.navigate(
-            [{ outlets: { detail: ['marker', 'new'] } }],
-            { relativeTo: this.route, queryParams: { lat, lng, address: place } }
+            [{outlets: {detail: ['marker', 'new']}}],
+            {relativeTo: this.route, queryParams: {lat, lng, address: place}}
           );
         });
       });
 
       this.map!.on('contextmenu', (e: mapboxgl.MapMouseEvent) => {
-        const { lng, lat } = e.lngLat;
+        const {lng, lat} = e.lngLat;
         this.showTempMarker(lng, lat);
         this.zone.run(() => {
           this.router.navigate(
-            [{ outlets: { detail: ['marker', 'new'] } }],
-            { relativeTo: this.route, queryParams: { lat, lng } }
+            [{outlets: {detail: ['marker', 'new']}}],
+            {relativeTo: this.route, queryParams: {lat, lng}}
           );
         });
       });
@@ -127,11 +169,22 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
     this.router.events
       .pipe(filter(e => e instanceof NavigationEnd))
       .subscribe(() => {
-        const hasDetail = this.route.children.some(c => c.outlet === 'detail');
-        if (!this.detailDrawer) return;
-        if (hasDetail) this.detailDrawer.open();
-        else this.detailDrawer.close();
+        const hasDetail = this.hasDetailOutlet(this.router.routerState.root);
+        if (hasDetail) {
+          this.detailDrawer?.open();
+        } else {
+          this.detailDrawer?.close();
+        }
       });
+  }
+
+  private hasDetailOutlet(route: ActivatedRoute | null): boolean {
+    if (!route) return false;
+    for (const child of route.children) {
+      if (child.outlet === 'detail') return true;
+      if (this.hasDetailOutlet(child)) return true;
+    }
+    return false;
   }
 
   private loadMarkersInView(): void {
@@ -155,28 +208,40 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
 
   startCreate() {
     const center = this.map?.getCenter();
-    const queryParams = center ? { lat: center.lat, lng: center.lng } : {};
+    const queryParams = center ? {lat: center.lat, lng: center.lng} : {};
     this.router.navigate(
-      [{ outlets: { detail: ['marker', 'new'] } }],
-      { relativeTo: this.route, queryParams }
+      [{outlets: {detail: ['marker', 'new']}}],
+      {relativeTo: this.route, queryParams}
     );
   }
 
   private renderMarkers(list: MarkerDto[]): void {
     this.markers.forEach(m => m.remove());
     this.markers = [];
+    this.markersById.clear();
 
     list.forEach(m => {
-      const popupHtml = `
-        <div style="max-width:240px">
-          <h4 style="margin:0 0 4px 0;">${escapeHtml(m.title)}</h4>
-          ${m.avgRating != null ? `<div style="font-size:12px;opacity:.8">⭐ ${m.avgRating?.toFixed?.(1) ?? m.avgRating} (${m.ratingsCount ?? 0})</div>` : ''}
-          ${m.description ? `<p style="margin:8px 0 0 0;">${escapeHtml(m.description)}</p>` : ''}
-          ${m.address ? `<p style="margin:8px 0 0 0; font-size:12px; opacity:.8">${escapeHtml(m.address)}</p>` : ''}
-        </div>
-      `;
+      const img = m.coverPhotoUrl
+        ? `<img src="${escapeHtml(m.coverPhotoUrl)}"
+           onerror="this.style.display='none'"
+           style="width:100%;border-radius:8px;margin-bottom:6px">`
+        : '';
 
-      const popup = new mapboxgl.Popup({ offset: 24, closeButton: false }).setHTML(popupHtml);
+      const popupHtml = `
+      <div style="max-width:240px">
+        ${img}
+        <h4 style="margin:0 0 4px 0;">${escapeHtml(m.title)}</h4>
+        ${m.owner?.username ? `<div style="font-size:12px;opacity:.85;display:flex;align-items:center;gap:6px">
+          <img src="${escapeHtml(m.owner.avatarUrl || this.defaultAvatar)}" onerror="this.style.display='none'"
+               style="width:16px;height:16px;border-radius:50%;object-fit:cover">
+          <span>@${escapeHtml(m.owner.username)}</span>
+        </div>` : ''}
+        ${m.avgRating != null ? `<div style="font-size:12px;opacity:.8;margin-top:2px">⭐ ${m.avgRating?.toFixed?.(1) ?? m.avgRating} (${m.ratingsCount ?? 0})</div>` : ''}
+        ${m.address ? `<p style="margin:8px 0 0 0; font-size:12px; opacity:.8">${escapeHtml(m.address)}</p>` : ''}
+      </div>
+    `;
+
+      const popup = new mapboxgl.Popup({offset: 24, closeButton: false}).setHTML(popupHtml);
 
       const marker = new mapboxgl.Marker()
         .setLngLat([m.lng, m.lat])
@@ -200,12 +265,22 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
 
       el.addEventListener('click', () => {
         this.zone.run(() => {
-          this.router.navigate([{ outlets: { detail: ['marker', m.id] } }], { relativeTo: this.route });
+          this.router.navigate(
+            [{outlets: {detail: ['marker', m.id]}}],
+            {
+              relativeTo: this.route,
+              queryParams: {lat: null, lng: null, z: null, focus: null},
+              queryParamsHandling: 'merge'
+            }
+          );
         });
       });
 
       this.markers.push(marker);
+      this.markersById.set(m.id, marker);
     });
+
+    this.tryOpenPendingPopup();
   }
 
   private showTempMarker(lng: number, lat: number) {
@@ -220,7 +295,7 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
     el.style.opacity = '0.85';
     el.style.border = '2px solid white';
 
-    this.tempMarker = new mapboxgl.Marker({ element: el, draggable: false })
+    this.tempMarker = new mapboxgl.Marker({element: el, draggable: false})
       .setLngLat([lng, lat])
       .addTo(this.map!);
   }
@@ -228,7 +303,10 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
   ngOnDestroy(): void {
     this.markers.forEach(m => m.remove());
     if (this.geocoder && this.map) {
-      try { this.map.removeControl(this.geocoder); } catch {}
+      try {
+        this.map.removeControl(this.geocoder);
+      } catch {
+      }
     }
     this.map?.remove();
     this.move$.complete();
@@ -242,22 +320,48 @@ export class HomeComponent implements OnInit, OnDestroy, AfterViewInit{
 
   onDrawerOpenedChange(opened: boolean) {
     setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
-
     if (!opened) {
       this.tempMarker?.remove();
       this.tempMarker = undefined;
-
       this.router.navigate(
-        [{ outlets: { detail: null } }],
-        { relativeTo: this.route, queryParamsHandling: 'preserve' }
+        [{outlets: {detail: null}}],
+        {
+          relativeTo: this.route,
+          queryParams: {lat: null, lng: null, z: null, focus: null},
+          queryParamsHandling: 'merge'
+        }
       );
     }
+  }
+
+  private tryOpenPendingPopup() {
+    if (!this.pendingFocusId || !this.map) return;
+    const mk = this.markersById.get(this.pendingFocusId);
+    if (!mk) return;
+
+    const pop = mk.getPopup?.();
+    if (pop) pop.addTo(this.map!);
+    this.pendingFocusId = undefined;
+  }
+
+  onDetailActivated() {
+    this.detailDrawer?.open();
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {lat: null, lng: null, z: null, focus: null},
+      queryParamsHandling: 'merge'
+    });
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+  }
+
+  onDetailDeactivated() {
+    this.detailDrawer?.close();
   }
 }
 
 function escapeHtml(s?: string): string {
   if (!s) return '';
   return s.replace(/[&<>"']/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'} as any)[c]
+    ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'} as any)[c]
   );
 }
