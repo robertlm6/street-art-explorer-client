@@ -27,6 +27,7 @@ import {CommonModule} from '@angular/common';
     RouterLink
   ],
   templateUrl: './register.component.html',
+  standalone: true,
   styleUrl: './register.component.css'
 })
 export class RegisterComponent {

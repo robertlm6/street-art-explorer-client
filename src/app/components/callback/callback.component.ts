@@ -7,6 +7,7 @@ import {Router} from '@angular/router';
   selector: 'app-callback',
   imports: [CommonModule],
   templateUrl: './callback.component.html',
+  standalone: true,
   styleUrl: './callback.component.css'
 })
 export class CallbackComponent implements OnInit{

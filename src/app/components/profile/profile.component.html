@@ -1,0 +1,79 @@
+<div class="p-state" *ngIf="loading">Loading…</div>
+<div class="p-state error" *ngIf="!loading && error">{{ error }}</div>
+
+<div class="p-container" *ngIf="!loading && !error && me as u">
+  <header class="p-header">
+    <div class="p-avatar-wrap">
+      <img class="p-avatar" [src]="u.avatarUrl || defaultAvatar" alt="avatar">
+      <div class="p-avatar-actions">
+        <button mat-stroked-button (click)="changeAvatar()">Change avatar</button>
+        <button mat-button color="warn" (click)="removeAvatar()">Remove avatar</button>
+      </div>
+    </div>
+
+    <div class="p-id">
+      <h1 class="p-username">{{ u.username }}</h1>
+      <div class="p-name" *ngIf="u.firstName || u.lastName">{{ u.firstName }} {{ u.lastName }}</div>
+
+      <div class="p-chips">
+        <span class="chip" *ngIf="u.createdAt">Member since: {{ u.createdAt | date:'MMMM y' }}</span>
+        <span class="chip"><mat-icon inline>location_on</mat-icon>{{ stats.markers }} markers</span>
+        <span class="chip" *ngIf="stats.weightedAvg != null">
+          <mat-icon inline>star</mat-icon>{{ stats.weightedAvg | number:'1.1-1' }} · {{ stats.totalRatings }} votes
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <section class="p-section">
+    <form [formGroup]="form" class="p-form" (ngSubmit)="save()">
+      <mat-form-field appearance="outline">
+        <mat-label>First Name</mat-label>
+        <input matInput formControlName="firstName">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Last Name</mat-label>
+        <input matInput formControlName="lastName">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="p-bio">
+        <mat-label>Bio</mat-label>
+        <textarea matInput rows="4" formControlName="bio"></textarea>
+      </mat-form-field>
+
+      <div class="p-actions">
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving">Save</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="p-section">
+    <h2>My markers</h2>
+
+    <div class="p-grid">
+      <a class="card"
+         *ngFor="let m of markers"
+         [routerLink]="['/home', { outlets: { detail: ['marker', m.id] } }]"
+         [queryParams]="{ lat: m.lat, lng: m.lng, z: 16, focus: m.id }">
+        <div class="thumb">
+          <img *ngIf="m.coverPhotoUrl; else ph" [src]="m.coverPhotoUrl" (error)="hideImg($event)" alt="">
+        </div>
+        <ng-template #ph>
+          <div class="thumb placeholder"><mat-icon>image</mat-icon></div>
+        </ng-template>
+
+        <div class="body">
+          <div class="title">{{ m.title }}</div>
+          <div class="addr" *ngIf="m.address">
+            <mat-icon inline>place</mat-icon>
+            <span>{{ m.address }}</span>
+          </div>
+          <div class="meta" *ngIf="m.ratingsCount != null">
+            ⭐ {{ m.avgRating | number:'1.1-1' }} ({{ m.ratingsCount }})
+          </div>
+        </div>
+      </a>
+    </div>
+  </section>
+</div>

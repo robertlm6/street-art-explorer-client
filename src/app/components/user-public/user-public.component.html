@@ -1,0 +1,63 @@
+<div class="up-state" *ngIf="loading">Loading…</div>
+<div class="up-state error" *ngIf="!loading && error">{{ error }}</div>
+
+<div class="up-container" *ngIf="!loading && !error && user as u">
+  <header class="up-header xl">
+    <img [src]="u.avatarUrl || defaultAvatar" class="up-avatar" alt="avatar">
+
+    <div class="up-id">
+      <h1 class="up-username">{{ u.username }}</h1>
+      <div class="up-name" *ngIf="u.firstName || u.lastName">{{ u.firstName }} {{ u.lastName }}</div>
+      <div class="up-meta">
+        <span *ngIf="u.createdAt">· Member since: {{ u.createdAt | date:'MMMM y' }}</span>
+      </div>
+
+      <div class="up-stats">
+        <span class="chip"><mat-icon inline>location_on</mat-icon>{{ stats.markers }} markers</span>
+        <span class="chip" *ngIf="stats.weightedAvg != null">
+          <mat-icon inline>star</mat-icon>{{ stats.weightedAvg | number:'1.1-1' }} · {{ stats.totalRatings }} votes
+        </span>
+      </div>
+
+      <p class="up-bio" *ngIf="u.bio">{{ u.bio }}</p>
+    </div>
+  </header>
+
+  <section class="up-section">
+    <h2>Markers de {{ u.username }}</h2>
+
+    <div class="grid">
+      <a class="card"
+         *ngFor="let m of markers"
+         [routerLink]="['/home', { outlets: { detail: ['marker', m.id] } }]"
+         [queryParams]="{ lat: m.lat, lng: m.lng, z: 16, focus: m.id }">
+        <div class="thumb">
+          <img *ngIf="m.coverPhotoUrl; else ph"
+               [src]="m.coverPhotoUrl"
+               (error)="onThumbError($event)"
+               alt="">
+        </div>
+        <ng-template #ph>
+          <div class="thumb placeholder">
+            <mat-icon>image</mat-icon>
+          </div>
+        </ng-template>
+
+        <div class="body">
+          <div class="title">{{ m.title }}</div>
+
+          <div class="addr" *ngIf="m.address">
+            <mat-icon inline>place</mat-icon>
+            <span>{{ m.address }}</span>
+          </div>
+
+          <div class="meta">
+            <span class="rating" *ngIf="m.ratingsCount != null">
+              ⭐ {{ m.avgRating | number:'1.1-1' }} ({{ m.ratingsCount }})
+            </span>
+          </div>
+        </div>
+      </a>
+    </div>
+  </section>
+</div>
