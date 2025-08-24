@@ -1,8 +1,9 @@
 import {inject, Injectable} from '@angular/core';
 import {environment} from '../../environments/environment';
 import {HttpClient, HttpParams} from '@angular/common/http';
-import {MarkerRankingItem, Paginated, Period, UserRankingItem} from '../models/rankings.models';
+import {MarkerRankingItem, Period, UserRankingItem} from '../models/rankings.models';
 import {Observable} from 'rxjs';
+import {Paginated} from '../models/shared.models';
 
 @Injectable({
   providedIn: 'root'
