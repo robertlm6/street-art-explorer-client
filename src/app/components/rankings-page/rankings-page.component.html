@@ -1,0 +1,121 @@
+<div class="rankings">
+  <div class="container">
+    <div class="controls">
+      <div class="group tabs">
+        <button [class.active]="tab() === 'users'" (click)="setTab('users')">Users</button>
+        <button [class.active]="tab() === 'markers'" (click)="setTab('markers')">Markers</button>
+      </div>
+      <div class="group subtabs">
+        <button [class.active]="period() === 'month'" (click)="setPeriod('month')">Month</button>
+        <button [class.active]="period() === 'year'" (click)="setPeriod('year')">Year</button>
+        <button [class.active]="period() === 'all'" (click)="setPeriod('all')">All time</button>
+      </div>
+    </div>
+
+    <div class="explainer">
+      <mat-icon class="info">info</mat-icon>
+      <span *ngIf="tab() === 'users'">
+        Ranked by activity: <b>markers created</b> (weight 1.0) + <b>ratings given</b> (weight 0.25).
+      </span>
+      <span *ngIf="tab() === 'markers'">
+        Ranked by rating confidence using the <b>Wilson score</b> on 1–5 star votes.
+      </span>
+      <button class="link" (click)="toggleDetails()">
+        {{ showDetails() ? 'Hide details' : 'Show details' }}
+      </button>
+    </div>
+
+    <section *ngIf="tab() === 'users'">
+      <ng-container *ngIf="!usersError(); else usersErr">
+        <ul class="list">
+          <li *ngFor="let u of users(); let i = index; trackBy: trackUser" class="row">
+            <div class="cell rank">#{{ i + 1 }}</div>
+
+            <a class="cell who link btn-like"
+               (click)="goToUser(u.userId)"
+               [attr.aria-label]="'Open profile of ' + (u.username || 'user')">
+              <img class="avatar" [src]="u.avatarUrl || defaultAvatar" alt="avatar">
+              <div class="name">{{ u.username || '(unknown user)' }}</div>
+            </a>
+
+            <div class="cell metric">
+              <mat-chip class="metric-chip">
+                <mat-icon>place</mat-icon>
+                <span class="label">Markers</span>
+                <span class="value">{{ u.markersCreated }}</span>
+              </mat-chip>
+            </div>
+
+            <div class="cell metric">
+              <mat-chip class="metric-chip">
+                <mat-icon>star</mat-icon>
+                <span class="label">Ratings</span>
+                <span class="value">{{ u.ratingsGiven }}</span>
+              </mat-chip>
+            </div>
+
+            <div class="cell metric" [class.hidden]="!showDetails()">
+              <mat-chip class="metric-chip accent">
+                <mat-icon>equalizer</mat-icon>
+                <span class="label">Activity</span>
+                <span class="value">{{ u.score | number:'1.0-2' }}</span>
+              </mat-chip>
+            </div>
+          </li>
+        </ul>
+
+        <div class="actions">
+          <button (click)="loadMoreUsers(period())" [disabled]="usersLoading() || usersNext() === null">
+            {{ usersNext() === null ? 'No more' : (usersLoading() ? 'Loading…' : 'Load more') }}
+          </button>
+        </div>
+      </ng-container>
+      <ng-template #usersErr>
+        <p class="error">{{ usersError() }}</p>
+      </ng-template>
+    </section>
+
+    <section *ngIf="tab() === 'markers'">
+      <ng-container *ngIf="!markersError(); else markersErr">
+        <ul class="list">
+          <li *ngFor="let m of markers(); let i = index; trackBy: trackMarker" class="row">
+            <div class="cell rank">#{{ i + 1 }}</div>
+
+            <button class="cell who link btn-like"
+                    (click)="goToMarker(m)"
+                    [attr.aria-label]="'Open marker ' + m.title">
+              <div class="name">{{ m.title }}</div>
+            </button>
+
+            <div class="cell metric">
+              <mat-chip class="metric-chip">
+                <mat-icon>how_to_vote</mat-icon>
+                <span class="label">Votes</span>
+                <span class="value">{{ m.ratingsCount }}</span>
+              </mat-chip>
+            </div>
+
+            <div class="cell metric hidden"></div>
+
+            <div class="cell metric" [class.hidden]="!showDetails()">
+              <mat-chip class="metric-chip accent">
+                <mat-icon>insights</mat-icon>
+                <span class="label">Confidence</span>
+                <span class="value">{{ m.wilson | number:'1.0-4' }}</span>
+              </mat-chip>
+            </div>
+          </li>
+        </ul>
+
+        <div class="actions">
+          <button (click)="loadMoreMarkers(period())" [disabled]="markersLoading() || markersNext() === null">
+            {{ markersNext() === null ? 'No more' : (markersLoading() ? 'Loading…' : 'Load more') }}
+          </button>
+        </div>
+      </ng-container>
+      <ng-template #markersErr>
+        <p class="error">{{ markersError() }}</p>
+      </ng-template>
+    </section>
+  </div>
+</div>
