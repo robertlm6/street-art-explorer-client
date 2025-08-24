@@ -5,13 +5,15 @@ import {CommonModule} from '@angular/common';
 import {MatIconModule} from '@angular/material/icon';
 import {MatChipsModule} from '@angular/material/chips';
 import {NavegationService} from '../../services/navegation.service';
+import {MatButtonToggleModule} from '@angular/material/button-toggle';
+import {MatButtonModule} from '@angular/material/button';
 
 type Tab = 'users' | 'markers';
 
 @Component({
   selector: 'app-rankings-page',
   standalone: true,
-  imports: [CommonModule, MatIconModule, MatChipsModule, MatIconModule],
+  imports: [CommonModule, MatIconModule, MatChipsModule, MatIconModule, MatButtonToggleModule, MatButtonModule],
   templateUrl: './rankings-page.component.html',
   styleUrl: './rankings-page.component.css'
 })

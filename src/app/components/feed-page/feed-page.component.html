@@ -1,0 +1,117 @@
+<div class="container">
+  <div class="controls">
+    <mat-button-toggle-group class="tabs" [value]="tab()" (change)="setTab($event.value)">
+      <mat-button-toggle value="newest">Newest</mat-button-toggle>
+      <mat-button-toggle value="nearby">Nearby</mat-button-toggle>
+      <mat-button-toggle value="trending">Trending</mat-button-toggle>
+      <mat-button-toggle value="top">Top</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <div class="right-controls">
+      <mat-form-field *ngIf="tab() === 'nearby'" class="radius-field compact" appearance="outline">
+        <mat-label>Radius</mat-label>
+        <mat-select [value]="radiusKm()" (selectionChange)="onRadiusChange($event.value)">
+          <mat-option [value]="2">2 km</mat-option>
+          <mat-option [value]="5">5 km</mat-option>
+          <mat-option [value]="10">10 km</mat-option>
+          <mat-option [value]="25">25 km</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-stroked-button
+              (click)="toggleDetails()"
+              [disabled]="tab() === 'newest' || tab() === 'nearby'">
+        {{ showDetails() ? 'Hide details' : 'Show details' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="explainer">
+    <mat-icon class="info">info</mat-icon>
+    <span *ngIf="tab() === 'newest'">Newest markers added.</span>
+    <span *ngIf="tab() === 'nearby'">Closest markers to you. {{ usedLocationNote() }}</span>
+    <span *ngIf="tab() === 'trending'">Top in the last 14 days (confidence × activity).</span>
+    <span *ngIf="tab() === 'top'">All-time highest rated markers.</span>
+  </div>
+
+  <div class="list">
+    <div class="row-card" *ngFor="let it of items(); trackBy: track" (click)="goToMarker(it)" tabindex="0" role="button"
+         aria-label="Open marker card">
+      <div class="cell thumb">
+        <img [src]="it.thumbnailUrl || defaultThumb" alt="">
+      </div>
+
+      <div class="cell title">
+        <div class="name" [matTooltip]="it.title">{{ it.title }}</div>
+
+        <div class="lines">
+          <div class="line creator-line" *ngIf="it.creatorUserId">
+            <a (click)="$event.stopPropagation(); goToUser(it.creatorUserId!)"
+               class="creator">
+              <img [src]="it.creatorAvatarUrl || defaultAvatar" alt="">
+              <span>{{ it.creatorUsername }}</span>
+            </a>
+          </div>
+
+          <div class="line addr-line" *ngIf="it.address">{{ it.address }}</div>
+
+          <div class="line coords-line">
+            {{ it.lat | number:'1.4-6' }}, {{ it.lng | number:'1.4-6' }}
+          </div>
+        </div>
+      </div>
+
+      <div class="cell desc" *ngIf="it.description as d">
+        {{ d }}
+      </div>
+      <div class="cell desc" *ngIf="!it.description"></div>
+
+      <div class="cell metric"
+           [class.hidden]="(tab()==='newest' && !it.createdAt) ||
+                          (tab()==='nearby' && it.distanceKm == null) ||
+                          (tab()==='trending' ? false : (tab()==='top' ? false : (tab()!=='newest' && tab()!=='nearby')))">
+        <mat-chip class="metric-chip" *ngIf="tab()==='newest' && it.createdAt">
+          <mat-icon>schedule</mat-icon>
+          <span class="label">Created</span>
+          <span class="value">{{ it.createdAt | date:'mediumDate' }}</span>
+        </mat-chip>
+
+        <mat-chip class="metric-chip" *ngIf="tab()==='nearby' && it.distanceKm != null">
+          <mat-icon>place</mat-icon>
+          <span class="label">Distance</span>
+          <span class="value">{{ it.distanceKm | number:'1.0-1' }} km</span>
+        </mat-chip>
+
+        <mat-chip class="metric-chip" *ngIf="tab()==='trending' || tab()==='top'">
+          <mat-icon>star</mat-icon>
+          <span class="label">Rating</span>
+          <span class="value">{{ it.avgRating | number:'1.0-2' }}/5</span>
+        </mat-chip>
+      </div>
+
+      <div class="cell metric" [class.hidden]="!(tab()==='trending' || tab()==='top')">
+        <mat-chip class="metric-chip">
+          <mat-icon>how_to_vote</mat-icon>
+          <span class="label">Votes</span>
+          <span class="value">{{ it.ratingsCount ?? it.recentVotes ?? 0 }}</span>
+        </mat-chip>
+      </div>
+
+      <div class="cell metric" [class.hidden]="!(showDetails() && (tab()==='trending' || tab()==='top'))">
+        <mat-chip class="metric-chip accent">
+          <mat-icon>insights</mat-icon>
+          <span class="label">Confidence</span>
+          <span class="value">{{ it.wilson | number:'1.0-4' }}</span>
+        </mat-chip>
+      </div>
+    </div>
+  </div>
+
+  <p class="error" *ngIf="error()">{{ error() }}</p>
+
+  <div class="actions">
+    <button mat-stroked-button (click)="loadMore()" [disabled]="loading() || next() === null">
+      {{ next() === null ? 'No more' : (loading() ? 'Loading…' : 'Load more') }}
+    </button>
+  </div>
+</div>

@@ -1,15 +1,21 @@
 <div class="rankings">
   <div class="container">
+
     <div class="controls">
-      <div class="group tabs">
-        <button [class.active]="tab() === 'users'" (click)="setTab('users')">Users</button>
-        <button [class.active]="tab() === 'markers'" (click)="setTab('markers')">Markers</button>
-      </div>
-      <div class="group subtabs">
-        <button [class.active]="period() === 'month'" (click)="setPeriod('month')">Month</button>
-        <button [class.active]="period() === 'year'" (click)="setPeriod('year')">Year</button>
-        <button [class.active]="period() === 'all'" (click)="setPeriod('all')">All time</button>
-      </div>
+      <mat-button-toggle-group [value]="tab()" (change)="setTab($event.value)">
+        <mat-button-toggle value="users">Users</mat-button-toggle>
+        <mat-button-toggle value="markers">Markers</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <mat-button-toggle-group [value]="period()" (change)="setPeriod($event.value)">
+        <mat-button-toggle value="month">Month</mat-button-toggle>
+        <mat-button-toggle value="year">Year</mat-button-toggle>
+        <mat-button-toggle value="all">All time</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <button mat-stroked-button (click)="toggleDetails()">
+        {{ showDetails() ? 'Hide details' : 'Show details' }}
+      </button>
     </div>
 
     <div class="explainer">
@@ -20,9 +26,6 @@
       <span *ngIf="tab() === 'markers'">
         Ranked by rating confidence using the <b>Wilson score</b> on 1–5 star votes.
       </span>
-      <button class="link" (click)="toggleDetails()">
-        {{ showDetails() ? 'Hide details' : 'Show details' }}
-      </button>
     </div>
 
     <section *ngIf="tab() === 'users'">
@@ -65,7 +68,9 @@
         </ul>
 
         <div class="actions">
-          <button (click)="loadMoreUsers(period())" [disabled]="usersLoading() || usersNext() === null">
+          <button mat-stroked-button
+                  (click)="loadMoreUsers(period())"
+                  [disabled]="usersLoading() || usersNext() === null">
             {{ usersNext() === null ? 'No more' : (usersLoading() ? 'Loading…' : 'Load more') }}
           </button>
         </div>
@@ -108,7 +113,9 @@
         </ul>
 
         <div class="actions">
-          <button (click)="loadMoreMarkers(period())" [disabled]="markersLoading() || markersNext() === null">
+          <button mat-stroked-button
+                  (click)="loadMoreMarkers(period())"
+                  [disabled]="markersLoading() || markersNext() === null">
             {{ markersNext() === null ? 'No more' : (markersLoading() ? 'Loading…' : 'Load more') }}
           </button>
         </div>

@@ -19,8 +19,3 @@ export interface MarkerRankingItem {
   avgNorm?: number;
   wilson: number;
 }
-
-export interface Paginated<T> {
-  items: T[];
-  nextOffset?: number | null;
-}

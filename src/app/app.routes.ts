@@ -8,6 +8,7 @@ import {MarkerDetailComponent} from './components/marker-detail/marker-detail.co
 import {ShellComponent} from './components/shell/shell.component';
 import {ProfileComponent} from './components/profile/profile.component';
 import {RankingsPageComponent} from './components/rankings-page/rankings-page.component';
+import {FeedPageComponent} from './components/feed-page/feed-page.component';
 
 export const routes: Routes = [
   {path: '', component: LoginComponent, pathMatch: 'full'},
@@ -34,6 +35,7 @@ export const routes: Routes = [
       },
       {path: 'profile', component: ProfileComponent},
       {path: 'ranking', component: RankingsPageComponent},
+      {path: 'feed', component: FeedPageComponent},
       {path: '', pathMatch: 'full', redirectTo: 'home'}
     ]
   },
